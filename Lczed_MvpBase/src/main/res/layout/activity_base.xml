@@ -1,0 +1,17 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/activity_base_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <include
+        android:id="@+id/activity_base_title_bar"
+        layout="@layout/title_bar" />
+
+    <include
+        android:id="@+id/activity_base_state_layout"
+        layout="@layout/layout_state"
+        android:visibility="gone" />
+
+</LinearLayout>

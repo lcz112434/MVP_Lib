@@ -1,0 +1,3 @@
+include ':Lczed_MvpBase'
+include ':app'
+rootProject.name = "GoTest"
