@@ -19,22 +19,24 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
             android:background="@null"
             android:text="暂无数据"
-            android:textSize="24dp" />
+            android:textSize="17dp" />
     </LinearLayout>
 
     <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
         android:id="@+id/rlv_nonetwork"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:visibility="gone">
 
         <ImageView
             android:id="@+id/nowork_iv"
             android:layout_width="70dp"
             android:layout_height="70dp"
             android:layout_centerInParent="true"
-            android:src="@drawable/nonetwrokicon" />
+            android:src="@drawable/net_error" />
 
         <TextView
             android:id="@+id/nowork_tv"
@@ -42,9 +44,9 @@
             android:layout_height="wrap_content"
             android:layout_below="@id/nowork_iv"
             android:layout_centerInParent="true"
+            android:layout_marginTop="10dp"
             android:text="网络异常,点击重新加载"
-            android:textColor="@color/mediumturquoise"
-            android:textSize="20dp" />
+            android:textSize="17dp" />
 
     </RelativeLayout>
 
@@ -56,8 +58,8 @@
 
         <com.lcz.lczed_mvpbase.widget.RotateDotView
             android:id="@+id/load_view"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
+            android:layout_width="70dp"
+            android:layout_height="70dp"
             android:layout_centerInParent="true"
             android:layout_centerHorizontal="true" />
 
@@ -66,7 +68,33 @@
             android:layout_height="wrap_content"
             android:layout_below="@id/load_view"
             android:layout_centerHorizontal="true"
-            android:layout_marginTop="5dp"
-            android:text="正在努力加载中···" />
+            android:layout_marginTop="10dp"
+            android:text="正在努力加载中···"
+            android:textSize="17dp" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/rlv_error"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="visible">
+
+        <ImageView
+            android:id="@+id/error_iv"
+            android:layout_width="70dp"
+            android:layout_height="70dp"
+            android:layout_centerInParent="true"
+            android:layout_gravity="center"
+            android:src="@drawable/error_icon" />
+
+        <TextView
+            android:id="@+id/tv_error_loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/error_iv"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="10dp"
+            android:text="网络加载失败，点击重新加载"
+            android:textSize="17dp" />
     </RelativeLayout>
 </RelativeLayout>

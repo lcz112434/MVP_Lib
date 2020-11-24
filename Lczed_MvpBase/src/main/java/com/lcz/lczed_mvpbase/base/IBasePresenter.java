@@ -1,15 +1,20 @@
 package com.lcz.lczed_mvpbase.base;
 
+import com.lcz.lczed_mvpbase.utils.BaseObserver;
+import com.lcz.lczed_mvpbase.utils.LogUtils;
+
 import java.lang.ref.WeakReference;
+
+import io.reactivex.annotations.NonNull;
 
 /**
  * @author: Lczed
  * @date on 2020/11/19 10:35 星期四
- * E-mail: lcz3466601343@163.com
+ * E-mail: lcz3466601343@163.com                                     s
  * Description :
  */
-public abstract class IBasePresenter<V extends IBaseView> {
-    private WeakReference<V> vWeakReference;
+public abstract class IBasePresenter<V extends IBaseView> extends BaseObserver {
+    WeakReference<V> vWeakReference;
 
     /**
      * 绑定View
@@ -23,11 +28,11 @@ public abstract class IBasePresenter<V extends IBaseView> {
         vWeakReference = new WeakReference<>(view);
     }
 
-
     //取消关联
     void detachView() {
         if (vWeakReference != null) {
             vWeakReference.clear();
+            deletDisposable();
         }
     }
 
@@ -37,4 +42,22 @@ public abstract class IBasePresenter<V extends IBaseView> {
     protected V getView() {
         return vWeakReference.get();
     }
-} 
+
+    //获取数据
+    protected abstract void getData();
+
+    //传入绑定的v层
+    protected abstract void setView(V view);
+
+    @Override
+    public void onNext(@NonNull Object o) {
+
+    }
+
+    @Override
+    public void onError(@NonNull Throwable e) {
+
+    }
+
+
+}

@@ -3,10 +3,16 @@ package com.lcz.lczed_mvpbase.base;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
+import android.net.ConnectivityManager;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Looper;
+import android.os.PersistableBundle;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
@@ -15,6 +21,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
@@ -22,11 +29,19 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.gyf.immersionbar.ImmersionBar;
 import com.lcz.lczed_mvpbase.R;
+import com.lcz.lczed_mvpbase.utils.ActivityCollector;
+import com.lcz.lczed_mvpbase.utils.LogUtils;
+import com.lcz.lczed_mvpbase.utils.NetBroadcastReceiver;
+import com.lcz.lczed_mvpbase.utils.NetUtil;
+import com.lcz.lczed_mvpbase.utils.OnMultiClickListener;
 import com.lcz.lczed_mvpbase.utils.SystemUtils;
+import com.lcz.lczed_mvpbase.utils.ToastUtil;
+import com.scwang.smart.refresh.layout.SmartRefreshLayout;
 
 import java.util.Timer;
 import java.util.TimerTask;
 
+import butterknife.ButterKnife;
 import butterknife.Unbinder;
 
 /**
@@ -40,6 +55,7 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
     protected AppCompatActivity activityCompat;
 
     protected Context context;
+
 
     // 是否允许全屏
     private boolean mAllowFullScreen = false;
@@ -60,26 +76,37 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
     TextView tvMiddle;//titleBar的标题
 
     View mStateLayout;//include的state_layout
-    RelativeLayout ll_page_state_error;//stateLayout网络错误的布局
+    RelativeLayout ll_page_state_nonetwork;//stateLayout网络错误的布局
     LinearLayout ll_page_state_empty;//stateLayout无数据的布局
     RelativeLayout ll_page_state_logding;//stateLayout加载中的布局
-    TextView btReload;//网络错误重新加载的布局
+    RelativeLayout ll_page_state_error;//stateLayout加载异常的布局
 
+
+    TextView btReload;//无网络重新加载的布局
+    TextView tv_error_loading;//加载失败重新加载的布局
+
+    public NetBroadcastReceiver netBroadcastReceiver;
+    public static NetBroadcastReceiver.NetEvent event;
+    private int netMobile;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         //注意：这里的setContentView必须有super才可以，需要走父类方法
+
         super.setContentView(R.layout.activity_base);
 
-
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);//设置竖屏模式
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             getWindow().getDecorView()
                     .setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                             | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         }
 
+//        initNet();
         initBaseView();
+        initLayout();
+        ActivityCollector.addActivity(this);
 
         //设置屏幕是否可旋转
         if (!isAllowScreenRoate) {
@@ -97,21 +124,32 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
         activityCompat = this;
         context = this;
         //判断是否有网络，如果无网络则提示对应页面
-        if (!SystemUtils.isNetworkConnected(this)) {
-
+        if (!SystemUtils.checkNetWork()) {
+            initTitleBar(true, false, "WanAndroid");
             showNetError();
         } else {
-            initView();
-            presenter = createPresenter();
-            presenter.attachView(this);
-            initData();
+            initCreae();
         }
 
     }
 
-    protected  void initLayout(int layout){
-        setContentView(layout);
+    public void initCreae() {
+        ButterKnife.bind(this);
+        initView();
+        presenter = createPresenter();
+        presenter.attachView(this);
+        initData();
+        initListener();
     }
+
+
+    protected abstract void initListener();
+
+    /**
+     * 页面布局绑定
+     */
+    protected abstract void initLayout();
+
 
     private void initBaseView() {
         mRootBaseView = (LinearLayout) findViewById(R.id.activity_base_root);
@@ -120,9 +158,12 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
         tvMiddle = (TextView) findViewById(R.id.title_bart_tv_middle);
         mStateLayout = findViewById(R.id.activity_base_state_layout);
         btReload = (TextView) findViewById(R.id.nowork_tv);
+        tv_error_loading = (TextView) findViewById(R.id.tv_error_loading);
         ll_page_state_empty = (LinearLayout) findViewById(R.id.rlv_nobody);
-        ll_page_state_error = (RelativeLayout) findViewById(R.id.rlv_nonetwork);
+        ll_page_state_nonetwork = (RelativeLayout) findViewById(R.id.rlv_nonetwork);
         ll_page_state_logding = (RelativeLayout) findViewById(R.id.rlv_loding);
+        ll_page_state_error = (RelativeLayout) findViewById(R.id.rlv_error);
+
 
     }
 
@@ -150,6 +191,8 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
         }
     }
 
+    //定时器
+    private CountDownTimer mTimer;
 
     /**
      * 切换页面的布局
@@ -163,53 +206,168 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
                     mStateLayout.setVisibility(View.GONE);
                 }
                 break;
-            case ERROR:
-                if (mStateLayout.getVisibility() == View.GONE) {
-                    mStateLayout.setVisibility(View.VISIBLE);
-                    ll_page_state_error.setVisibility(View.VISIBLE);
-                    ll_page_state_logding.setVisibility(View.GONE);
-                    btReload.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View view) {
-                            showToast("重新加载中");
-                            /*reloadInterface.reloadClickListener();*/
-                        }
-                    });
-                    ll_page_state_empty.setVisibility(View.GONE);
-                }
+            case NoWork:
+                caseNoNetWork();
                 break;
             case EMPTY:
-                if (mStateLayout.getVisibility() == View.GONE) {
-                    mStateLayout.setVisibility(View.VISIBLE);
-                    ll_page_state_error.setVisibility(View.GONE);
-                    ll_page_state_logding.setVisibility(View.GONE);
-                    ll_page_state_empty.setVisibility(View.VISIBLE);
-                }
+                caseEMPTY();
                 break;
             case LODING:
-                if (mStateLayout.getVisibility() == View.GONE) {
-                    mStateLayout.setVisibility(View.VISIBLE);
-                    ll_page_state_error.setVisibility(View.GONE);
-                    ll_page_state_empty.setVisibility(View.GONE);
-                    ll_page_state_logding.setVisibility(View.VISIBLE);
-                }
+                caseLoding();
                 break;
-
+            case ERROR:
+                caseERROR();
+                break;
         }
-
     }
 
-
-    //网络错误重新加载的接口
-    public ReloadInterface reloadInterface;
-
-    public void setReloadInterface(ReloadInterface reloadInterface) {
-        this.reloadInterface = reloadInterface;
+    private void caseERROR() {
+        if (mStateLayout.getVisibility() == View.GONE) {
+            mStateLayout.setVisibility(View.VISIBLE);
+            ll_page_state_nonetwork.setVisibility(View.GONE);
+            ll_page_state_error.setVisibility(View.VISIBLE);
+            ll_page_state_empty.setVisibility(View.GONE);
+            ll_page_state_logding.setVisibility(View.GONE);
+            tv_error_loading.setOnClickListener(new OnMultiClickListener() {
+                @Override
+                public void onMultiClick(View v) {
+                    if (SystemUtils.checkNetWork()) {
+                        LogUtils.d("有网络");
+                        showOk();
+                        initCreae();
+                    } else {
+                        showLoading();
+                        onTimeing();
+                    }
+                }
+            });
+        } else {
+            mStateLayout.setVisibility(View.VISIBLE);
+            ll_page_state_nonetwork.setVisibility(View.GONE);
+            ll_page_state_error.setVisibility(View.VISIBLE);
+            ll_page_state_empty.setVisibility(View.GONE);
+            ll_page_state_logding.setVisibility(View.GONE);
+            tv_error_loading.setOnClickListener(new OnMultiClickListener() {
+                @Override
+                public void onMultiClick(View v) {
+                    if (SystemUtils.checkNetWork()) {
+                        LogUtils.d("有网络");
+                        showOk();
+                        initCreae();
+                    } else {
+                        showLoading();
+                        onTimeing();
+                    }
+                }
+            });
+        }
     }
 
-    public interface ReloadInterface {
-        void reloadClickListener();
+    private void caseLoding() {
+        if (mStateLayout.getVisibility() == View.GONE) {
+            mStateLayout.setVisibility(View.VISIBLE);
+            ll_page_state_nonetwork.setVisibility(View.GONE);
+            ll_page_state_error.setVisibility(View.GONE);
+            ll_page_state_empty.setVisibility(View.GONE);
+            ll_page_state_logding.setVisibility(View.VISIBLE);
+        } else {
+            mStateLayout.setVisibility(View.VISIBLE);
+            ll_page_state_nonetwork.setVisibility(View.GONE);
+            ll_page_state_error.setVisibility(View.GONE);
+            ll_page_state_empty.setVisibility(View.GONE);
+            ll_page_state_logding.setVisibility(View.VISIBLE);
+        }
     }
+
+    private void caseEMPTY() {
+        if (mStateLayout.getVisibility() == View.GONE) {
+            mStateLayout.setVisibility(View.VISIBLE);
+            ll_page_state_nonetwork.setVisibility(View.GONE);
+            ll_page_state_logding.setVisibility(View.GONE);
+            ll_page_state_error.setVisibility(View.GONE);
+            ll_page_state_empty.setVisibility(View.VISIBLE);
+        } else {
+            ll_page_state_nonetwork.setVisibility(View.GONE);
+            ll_page_state_logding.setVisibility(View.GONE);
+            ll_page_state_error.setVisibility(View.GONE);
+            ll_page_state_empty.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void caseNoNetWork() {
+        if (mStateLayout.getVisibility() == View.GONE) {
+            mStateLayout.setVisibility(View.VISIBLE);
+            ll_page_state_nonetwork.setVisibility(View.VISIBLE);
+            ll_page_state_logding.setVisibility(View.GONE);
+            ll_page_state_error.setVisibility(View.GONE);
+            btReload.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    showToast("重新加载中");
+                    if (SystemUtils.checkNetWork()) {
+                        LogUtils.d("有网络");
+                        showOk();
+                        initCreae();
+                    } else {
+                        showLoading();
+                        onTimeing();
+                    }
+                }
+            });
+            ll_page_state_empty.setVisibility(View.GONE);
+        } else {
+            mStateLayout.setVisibility(View.VISIBLE);
+            ll_page_state_nonetwork.setVisibility(View.VISIBLE);
+            ll_page_state_logding.setVisibility(View.GONE);
+            ll_page_state_error.setVisibility(View.GONE);
+            btReload.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    showToast("重新加载中");
+                    if (SystemUtils.checkNetWork()) {
+                        LogUtils.d("有网络");
+                        showOk();
+                        initCreae();
+                    } else {
+                        showLoading();
+                        onTimeing();
+                    }
+                }
+            });
+            ll_page_state_empty.setVisibility(View.GONE);
+        }
+    }
+
+    private void onTimeing() {
+
+        mTimer = new CountDownTimer((long) (5 * 1000), 1000) {
+            int a = 1;
+
+            @Override
+            public void onTick(long millisUntilFinished) {
+                if (SystemUtils.checkNetWork()) {
+                    LogUtils.d("有网络");
+                    showOk();
+                    initCreae();
+                    a = 0;
+                } else {
+                    a = 1;
+                }
+            }
+
+            @Override
+            public void onFinish() {
+                if (a == 1) {
+                    showDataError();
+                    ToastUtil.showShort("加载失败");
+                } else {
+                    ToastUtil.showShort("加载完成");
+                }
+            }
+        };
+        mTimer.start();
+    }
+
 
     public enum PageState {
         /**
@@ -223,11 +381,15 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
         /**
          * 无网络
          */
-        ERROR,
+        NoWork,
         /**
          * 数据加载中
          */
-        LODING
+        LODING,
+        /**
+         * 数据失败
+         */
+        ERROR
     }
 
 
@@ -238,24 +400,29 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
                 .transparentStatusBar()
                 .statusBarDarkFont(true)
                 .init();//透明状态栏，不写默认透明色
-
     }
 
-    protected void initData() {
-    }
+    /**
+     * 页面数据初始化
+     */
+    protected abstract void initData();
 
-    protected void initView() {
-    }
+    /**
+     * 页面控件初始化
+     */
+    protected abstract void initView();
 
     @Override
     protected void onResume() {
         super.onResume();
+        //P层绑定V层
         if (presenter != null) {
             presenter.attachView(this);
         }
     }
 
-   /* *//**
+    /*
+    /**
      * 必须重写setContentView注意不能够添加这行代码 目的将当前界面的布局添加到BaseActivity中去
      * super.setContentView(R.layout.activity_base);
      */
@@ -267,6 +434,10 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
         if (null != mRootBaseView) {
             mRootBaseView.addView(view, lp);
         }
+    }
+
+    protected <T extends View> T findByid(int resId) {
+        return (T) findViewById(resId);
     }
 
     //封装Toast对象
@@ -309,20 +480,21 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
     }
 
     /**
-     * 数据加载完成，页面隐藏
+     * 数据加载失败
      */
-    @Override
-    public void hideLoading() {
-        changePageState(PageState.NORMAL);
+
+    public void showLoadEorror() {
+        changePageState(PageState.LODING);
     }
 
     /**
      * 数据加载完成，页面隐藏
      */
     @Override
-    public void finishRefresh() {
-
+    public void showOk() {
+        changePageState(PageState.NORMAL);
     }
+
 
     /**
      * 是否允许屏幕旋转
@@ -338,16 +510,23 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
      */
     @Override
     public void showNetError() {
-        changePageState(PageState.ERROR);
+        changePageState(PageState.NoWork);
     }
 
 
-
     /**
-     * @param tips 数据请求失败
+     * 数据加载失败
      */
     @Override
-    public void showDataError(String tips) {
+    public void showDataError() {
+        changePageState(PageState.ERROR);
+    }
+
+    /**
+     * 数据为空
+     */
+    @Override
+    public void showDataNull() {
         changePageState(PageState.EMPTY);
     }
 
@@ -472,7 +651,11 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
         if (unbinder != null) {
             unbinder.unbind();
         }
+        if (ActivityCollector.activities.size() > 0) {
+            ActivityCollector.finishAll();
+        }
 //        ImmersionBar.with(this).destoy();  //不调用该方法，如果界面bar发生改变，在不关闭app的情况下，退出此界面再进入将记忆最后一次bar改变的状态
+//        unregisterReceiver(netBroadcastReceiver);
     }
 
     private boolean isExit = false; // 是否退出按钮的转态标记
@@ -510,5 +693,34 @@ public abstract class BaseActivity<P extends IBasePresenter> extends BasePermiss
         }
         return super.onKeyDown(keyCode, event);
     }
+ /* private void initNet() {
+         event = this;
+         //实例化IntentFilter对象
+         IntentFilter filter = new IntentFilter();
+         filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+         filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+         filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+         filter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+         netBroadcastReceiver = new NetBroadcastReceiver();
+         registerReceiver(netBroadcastReceiver, filter);
+         inspectNet();
+     }
 
+    public boolean inspectNet() {
+        this.netMobile = NetUtil.getNetWorkState(BaseActivity.this);
+        return isNetConnect();
+    } */
+
+    /**
+     * 判断有无网络 。
+     *
+     * @return true 有网, false 没有网络.
+
+    public boolean isNetConnect() {
+    if (netMobile == -1) {
+    return false;
+    }
+    return true;
+    }
+     */
 }

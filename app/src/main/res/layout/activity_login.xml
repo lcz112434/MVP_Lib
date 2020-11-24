@@ -10,15 +10,14 @@
 
     <Button
         android:id="@+id/btn1"
+        android:text="无网络"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="无网络" />
-
+        android:layout_height="wrap_content"/>
     <Button
         android:id="@+id/btn2"
+        android:text="加载中"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="加载中" />
+        android:layout_height="wrap_content"/>
 
     <Button
         android:id="@+id/btn3"
@@ -31,10 +30,5 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="无数据" />
-
-    <ImageView
-        android:id="@+id/iv"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
 
 </LinearLayout>

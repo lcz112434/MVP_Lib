@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.lcz.lczed_mvpbase.utils.LogUtils;
+import com.lcz.lczed_mvpbase.utils.ToastUtil;
 import com.permissionx.guolindev.PermissionX;
 import com.permissionx.guolindev.callback.ExplainReasonCallback;
 import com.permissionx.guolindev.callback.ForwardToSettingsCallback;
@@ -32,9 +33,12 @@ public class BasePermissionActivity extends AppCompatActivity {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState, @Nullable PersistableBundle persistentState) {
         super.onCreate(savedInstanceState, persistentState);
+
     }
 
-    //获取权限
+    private Boolean isok = true;
+
+    //获取app启动时必要权限
     protected void GetPermissions() {
         PermissionX.init(this)//Fragment传this，Activity传Activity对象。
                 //权限列表 可手动添加
@@ -68,5 +72,79 @@ public class BasePermissionActivity extends AppCompatActivity {
                         }
                     }
                 });
+    }
+
+    //获取单个权限
+    protected Boolean GetPermissions(String permission) {
+        PermissionX.init(this)//Fragment传this，Activity传Activity对象。
+                //权限列表 可手动添加
+                .permissions(permission)
+                //用户拒绝权限，需要重新申请权限
+                .onExplainRequestReason(new ExplainReasonCallback() {
+                    @Override
+                    public void onExplainReason(ExplainScope scope, List<String> deniedList) {
+                        scope.showRequestReasonDialog(deniedList, "即将重新申请的权限是程序必须依赖的权限", "我已明白", "取消");
+                    }
+                })
+                //用户强制拒绝权限，但是权限是必要的，需要去程序设置中打开。
+                .onForwardToSettings(new ForwardToSettingsCallback() {
+                    @Override
+                    public void onForwardToSettings(ForwardScope scope, List<String> deniedList) {
+                        scope.showForwardToSettingsDialog(deniedList, "您需要去应用程序设置当中手动开启权限", "我已明白", "取消");
+                    }
+                })
+                //用户权限授权结果
+                .request(new RequestCallback() {
+                    @Override
+                    public void onResult(boolean allGranted, List<String> grantedList, List<String> deniedList) {
+                        if (allGranted) {
+                            LogUtils.d("权限授权成功");
+                            isok = true;
+                        } else {
+                            Toast.makeText(BasePermissionActivity.this, "权限不通过!", Toast.LENGTH_SHORT).show();
+                            //权限不通过，无法使用
+                            isok = false;
+                        }
+                    }
+                });
+        return isok;
+    }
+
+
+    //获取多组权限
+    protected Boolean GetPermissions(String[] permission) {
+
+        PermissionX.init(this)//Fragment传this，Activity传Activity对象。
+                //权限列表 可手动添加
+                .permissions(permission)
+                //用户拒绝权限，需要重新申请权限
+                .onExplainRequestReason(new ExplainReasonCallback() {
+                    @Override
+                    public void onExplainReason(ExplainScope scope, List<String> deniedList) {
+                        scope.showRequestReasonDialog(deniedList, "即将重新申请的权限是程序必须依赖的权限", "我已明白", "取消");
+                    }
+                })
+                //用户强制拒绝权限，但是权限是必要的，需要去程序设置中打开。
+                .onForwardToSettings(new ForwardToSettingsCallback() {
+                    @Override
+                    public void onForwardToSettings(ForwardScope scope, List<String> deniedList) {
+                        scope.showForwardToSettingsDialog(deniedList, "您需要去应用程序设置当中手动开启权限", "我已明白", "取消");
+                    }
+                })
+                //用户权限授权结果
+                .request(new RequestCallback() {
+                    @Override
+                    public void onResult(boolean allGranted, List<String> grantedList, List<String> deniedList) {
+                        if (allGranted) {
+                            LogUtils.d("权限授权成功");
+                            isok = true;
+                        } else {
+                            Toast.makeText(BasePermissionActivity.this, "权限不通过!", Toast.LENGTH_SHORT).show();
+                            //权限不通过，无法使用。
+                            isok = false;
+                        }
+                    }
+                });
+        return isok;
     }
 }

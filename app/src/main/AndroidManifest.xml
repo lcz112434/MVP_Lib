@@ -4,8 +4,12 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
+        android:name=".MyAPP"
         android:requestLegacyExternalStorage="true"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -13,15 +17,14 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.GoTest">
+        <activity android:name=".LoginActivity"></activity>
         <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-
-        <!--清单文件内填写 根据ui设计图填写对应的dp值-->
+        </activity> <!-- 清单文件内填写 根据ui设计图填写对应的dp值 -->
         <!-- autosize 屏幕适配 -->
         <meta-data
             android:name="design_width_in_dp"
@@ -29,7 +32,16 @@
         <meta-data
             android:name="design_height_in_dp"
             android:value="640" />
-        <!-- autosize 屏幕适配结束 -->
+
+        <receiver android:name="com.lcz.lczed_mvpbase.utils.NetBroadcastReceiver">
+                   
+            <intent-filter>
+                           
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+                       
+            </intent-filter>
+               
+        </receiver>
     </application>
 
 </manifest>

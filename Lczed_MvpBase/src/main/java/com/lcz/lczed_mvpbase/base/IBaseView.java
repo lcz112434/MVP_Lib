@@ -13,9 +13,9 @@ public interface IBaseView {
     void showLoading();
 
     /**
-     * 隐藏加载
+     * 加载成功，隐藏加载
      */
-    void hideLoading();
+    void showOk();
 
     /**
      * 显示网络错误，网络异常在 BaseActivity 和 BaseFragment 统一处理
@@ -23,12 +23,13 @@ public interface IBaseView {
     void showNetError();
 
     /**
-     * 完成刷新, 新增控制刷新
-     */
-    void finishRefresh();
-
-    /**
      * 显示数据加载错误
      */
-    void showDataError(String tips);
-} 
+    void showDataError();
+
+    /**
+     * 显示数据为空
+     */
+
+    void showDataNull();
+}
